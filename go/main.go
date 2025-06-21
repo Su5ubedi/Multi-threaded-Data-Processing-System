@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"os"
@@ -106,7 +107,7 @@ func (s *ResultStorage) Close() error {
 }
 
 // Worker processes tasks from the queue
-func Worker(name string, queue *SharedQueue, storage *ResultStorage, taskWg *sync.WaitGroup, wg *sync.WaitGroup) {
+func Worker(name string, queue *SharedQueue, storage *ResultStorage, wg *sync.WaitGroup) {
 	defer wg.Done()
 	defer log.Printf("%s completed", name)
 
@@ -125,9 +126,6 @@ func Worker(name string, queue *SharedQueue, storage *ResultStorage, taskWg *syn
 		if err != nil {
 			log.Printf("%s error processing task %d: %v", name, task.ID, err)
 		}
-
-		// Mark task as done
-		taskWg.Done()
 	}
 }
 
@@ -158,7 +156,6 @@ type DataProcessingSystem struct {
 	queue   *SharedQueue
 	storage *ResultStorage
 	wg      sync.WaitGroup
-	taskWg  sync.WaitGroup // Track individual tasks
 }
 
 // NewDataProcessingSystem creates a new system
@@ -178,15 +175,7 @@ func NewDataProcessingSystem(queueSize int, outputFile string) (*DataProcessingS
 
 // AddTask adds a task to the system
 func (s *DataProcessingSystem) AddTask(task Task) error {
-	s.taskWg.Add(1) // Add to task counter
 	return s.queue.AddTask(task)
-}
-
-// WaitForTasks waits for all tasks to complete
-func (s *DataProcessingSystem) WaitForTasks() {
-	log.Println("Waiting for all tasks to complete...")
-	s.taskWg.Wait()
-	log.Println("All tasks completed")
 }
 
 // Start begins processing with workers
@@ -195,7 +184,7 @@ func (s *DataProcessingSystem) Start(numWorkers int) {
 
 	for i := 0; i < numWorkers; i++ {
 		s.wg.Add(1)
-		go Worker(fmt.Sprintf("Worker-%d", i+1), s.queue, s.storage, &s.taskWg, &s.wg)
+		go Worker(fmt.Sprintf("Worker-%d", i+1), s.queue, s.storage, &s.wg)
 	}
 }
 
@@ -218,13 +207,14 @@ func (s *DataProcessingSystem) Shutdown() {
 }
 
 func main() {
-	// Setup logging
+	// Setup logging to both console and file
 	logFile, err := os.OpenFile("system.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		log.Printf("Failed to open log file: %v", err)
 	} else {
 		defer logFile.Close()
-		log.SetOutput(logFile)
+		// Log to both console and file
+		log.SetOutput(io.MultiWriter(os.Stdout, logFile))
 	}
 
 	// Initialize system
@@ -251,8 +241,8 @@ func main() {
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	// Wait for all tasks to complete
-	system.WaitForTasks()
+	// Wait for processing to complete
+	time.Sleep(2 * time.Second)
 
 	// Shutdown
 	system.Shutdown()

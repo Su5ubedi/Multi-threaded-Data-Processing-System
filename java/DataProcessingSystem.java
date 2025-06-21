@@ -305,15 +305,15 @@ public class DataProcessingSystem {
         DataProcessingSystem system = null;
 
         try {
-            // Initialize with 3 workers
-            system = new DataProcessingSystem(3, "results.txt");
+            // Initialize with 2 workers
+            system = new DataProcessingSystem(2, "results.txt");
             system.start();
 
             // Prepare for 10 tasks (like Go's WaitGroup.Add())
-            system.addTasks(10);
+            system.addTasks(4);
 
             // Add sample tasks
-            for (int i = 1; i <= 10; i++) {
+            for (int i = 1; i <= 4; i++) {
                 system.addTask(new Task(i, "data_" + i));
                 Thread.sleep(50);
             }
